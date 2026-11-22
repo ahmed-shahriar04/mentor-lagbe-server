@@ -46,6 +46,18 @@ router.patch('/profile', verifyToken, async (req, res) => {
       { $set: updateFields }
     );
 
+    // Also sync tutor name and avatar on all their posted tuitions
+    const { tuitionsCollection } = getCollections();
+    const tuitionUpdates = {};
+    if (name) tuitionUpdates.tutorName = name.trim();
+    if (image) tuitionUpdates.tutorImage = image.trim();
+    if (Object.keys(tuitionUpdates).length > 0) {
+      await tuitionsCollection.updateMany(
+        { tutorEmail: req.user.email },
+        { $set: tuitionUpdates }
+      );
+    }
+
     const updatedUser = await usersCollection.findOne({ email: req.user.email });
 
     res.json({

@@ -82,11 +82,14 @@ router.get('/public', async (req, res) => {
 
     const enrichedTuitions = tuitions.map((t) => {
       const tutor = tutorMap.get(t.tutorEmail);
+      const realImage = tutor ? (tutor.image || null) : (t.tutorImage || null);
+      const realName = tutor ? (tutor.name || t.tutorName) : t.tutorName;
+      const isProTutor = tutor ? tutor.plan === 'pro' : Boolean(t.isProTutor);
       return {
         ...t,
-        tutorImage: tutor?.image || t.tutorImage || null,
-        tutorName: tutor?.name || t.tutorName,
-        isProTutor: tutor ? tutor.plan === 'pro' : false,
+        tutorImage: realImage,
+        tutorName: realName,
+        isProTutor,
       };
     });
 
@@ -127,11 +130,14 @@ router.get('/featured', async (req, res) => {
 
     const enrichedFeatured = featured.map((t) => {
       const tutor = tutorMap.get(t.tutorEmail);
+      const realImage = tutor ? (tutor.image || null) : (t.tutorImage || null);
+      const realName = tutor ? (tutor.name || t.tutorName) : t.tutorName;
+      const isProTutor = tutor ? tutor.plan === 'pro' : Boolean(t.isProTutor);
       return {
         ...t,
-        tutorImage: tutor?.image || t.tutorImage || null,
-        tutorName: tutor?.name || t.tutorName,
-        isProTutor: tutor ? tutor.plan === 'pro' : false,
+        tutorImage: realImage,
+        tutorName: realName,
+        isProTutor,
       };
     });
 
@@ -170,6 +176,9 @@ router.get('/:id', async (req, res) => {
       success: true,
       data: {
         ...tuition,
+        tutorImage: tutor ? (tutor.image || null) : (tuition.tutorImage || null),
+        tutorName: tutor ? (tutor.name || tuition.tutorName) : tuition.tutorName,
+        isProTutor: tutor ? tutor.plan === 'pro' : Boolean(tuition.isProTutor),
         tutorDetails: tutor || { name: tuition.tutorName, email: tuition.tutorEmail },
       },
     });
@@ -195,6 +204,7 @@ router.post('/', verifyToken, verifyTutor, async (req, res) => {
       location,
       monthlyFee,
       daysPerWeek,
+      classTime,
       bannerImage,
       description,
     } = req.body;
@@ -230,6 +240,7 @@ router.post('/', verifyToken, verifyTutor, async (req, res) => {
       location: location ? location.trim() : (mode === 'Online' ? 'Online' : 'Location Not Specified'),
       monthlyFee: parseFloat(monthlyFee) || 0,
       daysPerWeek: parseInt(daysPerWeek, 10) || 3,
+      classTime: classTime ? classTime.trim() : 'Evening (6:00 PM - 7:30 PM)',
       bannerImage: bannerImage || 'https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=800&auto=format&fit=crop',
       description: description.trim(),
       tutorName: req.user.name,
@@ -305,6 +316,7 @@ router.put('/:id', verifyToken, verifyTutor, async (req, res) => {
       location,
       monthlyFee,
       daysPerWeek,
+      classTime,
       bannerImage,
       description,
     } = req.body;
