@@ -11,11 +11,22 @@ const router = express.Router();
  */
 router.get('/me', verifyToken, async (req, res) => {
   try {
-    const { usersCollection } = getCollections();
+    const { usersCollection, paymentsCollection } = getCollections();
     const user = await usersCollection.findOne({ email: req.user.email });
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Only grant Pro plan if verified payment exists in paymentsCollection
+    const hasPaid = await paymentsCollection.findOne({
+      userEmail: user.email,
+      paymentStatus: 'paid',
+    });
+
+    if (!hasPaid && user.plan === 'pro') {
+      await usersCollection.updateOne({ email: user.email }, { $set: { plan: 'free' } });
+      user.plan = 'free';
     }
 
     res.json({ success: true, data: user });

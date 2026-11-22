@@ -204,15 +204,18 @@ router.patch('/:id/status', verifyToken, verifyTutor, async (req, res) => {
  */
 router.get('/student/stats', verifyToken, verifyStudent, async (req, res) => {
   try {
-    const { applicationsCollection, usersCollection } = getCollections();
+    const { applicationsCollection, usersCollection, paymentsCollection } = getCollections();
     const email = req.user.email;
 
-    const [totalApplied, accepted, pending, user] = await Promise.all([
+    const [totalApplied, accepted, pending, user, hasPaid] = await Promise.all([
       applicationsCollection.countDocuments({ studentEmail: email }),
       applicationsCollection.countDocuments({ studentEmail: email, status: 'accepted' }),
       applicationsCollection.countDocuments({ studentEmail: email, status: 'pending' }),
       usersCollection.findOne({ email }),
+      paymentsCollection.findOne({ userEmail: email, paymentStatus: 'paid' }),
     ]);
+
+    const effectivePlan = hasPaid ? 'pro' : 'free';
 
     res.json({
       success: true,
@@ -220,7 +223,7 @@ router.get('/student/stats', verifyToken, verifyStudent, async (req, res) => {
         totalApplied,
         accepted,
         pending,
-        currentPlan: user?.plan || 'free',
+        currentPlan: effectivePlan,
       },
     });
   } catch (error) {
@@ -235,15 +238,18 @@ router.get('/student/stats', verifyToken, verifyStudent, async (req, res) => {
  */
 router.get('/tutor/stats', verifyToken, verifyTutor, async (req, res) => {
   try {
-    const { tuitionsCollection, applicationsCollection, usersCollection } = getCollections();
+    const { tuitionsCollection, applicationsCollection, usersCollection, paymentsCollection } = getCollections();
     const email = req.user.email;
 
-    const [totalPosted, activeApproved, totalApplicants, user] = await Promise.all([
+    const [totalPosted, activeApproved, totalApplicants, user, hasPaid] = await Promise.all([
       tuitionsCollection.countDocuments({ tutorEmail: email }),
       tuitionsCollection.countDocuments({ tutorEmail: email, approvalStatus: 'approved', isActive: true }),
       applicationsCollection.countDocuments({ tutorEmail: email }),
       usersCollection.findOne({ email }),
+      paymentsCollection.findOne({ userEmail: email, paymentStatus: 'paid' }),
     ]);
+
+    const effectivePlan = hasPaid ? 'pro' : 'free';
 
     res.json({
       success: true,
@@ -251,7 +257,7 @@ router.get('/tutor/stats', verifyToken, verifyTutor, async (req, res) => {
         totalPosted,
         activeApproved,
         totalApplicants,
-        currentPlan: user?.plan || 'free',
+        currentPlan: effectivePlan,
       },
     });
   } catch (error) {

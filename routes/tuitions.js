@@ -12,7 +12,7 @@ const router = express.Router();
  */
 router.get('/public', async (req, res) => {
   try {
-    const { tuitionsCollection, usersCollection } = getCollections();
+    const { tuitionsCollection, usersCollection, paymentsCollection } = getCollections();
     const {
       search = '',
       subject = '',
@@ -73,18 +73,25 @@ router.get('/public', async (req, res) => {
       .limit(limitNumber)
       .toArray();
 
-    // Populate actual mentor image and pro status from usersCollection
+    // Populate actual mentor image and genuine verified pro status from usersCollection & paymentsCollection
     const tutorEmails = [...new Set(tuitions.map((t) => t.tutorEmail).filter(Boolean))];
-    const tutors = await usersCollection
-      .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
-      .toArray();
+    const [tutors, paidTutors] = await Promise.all([
+      usersCollection
+        .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
+        .toArray(),
+      paymentsCollection
+        .find({ userEmail: { $in: tutorEmails }, paymentStatus: 'paid' }, { projection: { userEmail: 1 } })
+        .toArray(),
+    ]);
     const tutorMap = new Map(tutors.map((u) => [u.email, u]));
+    const paidTutorSet = new Set(paidTutors.map((p) => p.userEmail));
 
     const enrichedTuitions = tuitions.map((t) => {
       const tutor = tutorMap.get(t.tutorEmail);
       const realImage = tutor ? (tutor.image || null) : (t.tutorImage || null);
       const realName = tutor ? (tutor.name || t.tutorName) : t.tutorName;
-      const isProTutor = tutor ? tutor.plan === 'pro' : Boolean(t.isProTutor);
+      // Pro badge only if verified paid payment exists
+      const isProTutor = tutor ? (tutor.plan === 'pro' && paidTutorSet.has(tutor.email)) : false;
       return {
         ...t,
         tutorImage: realImage,
@@ -115,7 +122,7 @@ router.get('/public', async (req, res) => {
  */
 router.get('/featured', async (req, res) => {
   try {
-    const { tuitionsCollection, usersCollection } = getCollections();
+    const { tuitionsCollection, usersCollection, paymentsCollection } = getCollections();
     const featured = await tuitionsCollection
       .find({ approvalStatus: 'approved', isActive: true })
       .sort({ createdAt: -1 })
@@ -123,16 +130,23 @@ router.get('/featured', async (req, res) => {
       .toArray();
 
     const tutorEmails = [...new Set(featured.map((t) => t.tutorEmail).filter(Boolean))];
-    const tutors = await usersCollection
-      .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
-      .toArray();
+    const [tutors, paidTutors] = await Promise.all([
+      usersCollection
+        .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
+        .toArray(),
+      paymentsCollection
+        .find({ userEmail: { $in: tutorEmails }, paymentStatus: 'paid' }, { projection: { userEmail: 1 } })
+        .toArray(),
+    ]);
     const tutorMap = new Map(tutors.map((u) => [u.email, u]));
+    const paidTutorSet = new Set(paidTutors.map((p) => p.userEmail));
 
     const enrichedFeatured = featured.map((t) => {
       const tutor = tutorMap.get(t.tutorEmail);
       const realImage = tutor ? (tutor.image || null) : (t.tutorImage || null);
       const realName = tutor ? (tutor.name || t.tutorName) : t.tutorName;
-      const isProTutor = tutor ? tutor.plan === 'pro' : Boolean(t.isProTutor);
+      // Pro badge only if genuine verified payment exists
+      const isProTutor = tutor ? (tutor.plan === 'pro' && paidTutorSet.has(tutor.email)) : false;
       return {
         ...t,
         tutorImage: realImage,
