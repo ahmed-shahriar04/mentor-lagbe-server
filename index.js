@@ -18,8 +18,12 @@ const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
 // Enable CORS
+// Permissive CORS for assignment production & preview domains
 app.use(cors({
-  origin: [CLIENT_URL, 'http://localhost:3000', 'https://mentorlagbe.vercel.app'],
+  origin: (origin, callback) => {
+    // Allow any origin in production/test to prevent CORS blocks
+    callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
