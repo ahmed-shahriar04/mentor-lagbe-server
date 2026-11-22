@@ -164,4 +164,57 @@ router.get('/admin/stats', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+/**
+ * Delete Current User Account (/dashboard/profile)
+ * DELETE /api/users/profile/me
+ */
+router.delete('/profile/me', verifyToken, async (req, res) => {
+  try {
+    const { usersCollection } = getCollections();
+    const result = await usersCollection.deleteOne({ email: req.user.email });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Account deleted successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting own account:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete account' });
+  }
+});
+
+/**
+ * Admin: Delete User
+ * DELETE /api/users/:id
+ */
+router.delete('/:id', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { usersCollection } = getCollections();
+
+    // Prevent deleting oneself
+    const targetUser = await usersCollection.findOne({ _id: new ObjectId(id) });
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (targetUser.email === req.user.email) {
+      return res.status(400).json({ success: false, message: 'Admin cannot delete their own active account' });
+    }
+
+    await usersCollection.deleteOne({ _id: new ObjectId(id) });
+
+    res.json({
+      success: true,
+      message: `User ${targetUser.name} deleted successfully`,
+    });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete user' });
+  }
+});
+
 export default router;
