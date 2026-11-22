@@ -393,6 +393,8 @@ export async function runSeed() {
 }
 
 // Run if called directly
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+// Run seed immediately
+runSeed();
+if (false) {
   runSeed();
 }
