@@ -119,8 +119,12 @@ router.patch('/:id/role', verifyToken, verifyAdmin, async (req, res) => {
     }
 
     const { usersCollection } = getCollections();
+    const query = ObjectId.isValid(id)
+      ? { $or: [{ _id: new ObjectId(id) }, { _id: id }] }
+      : { _id: id };
+
     const result = await usersCollection.updateOne(
-      { _id: new ObjectId(id) },
+      query,
       { $set: { role, updatedAt: new Date() } }
     );
 

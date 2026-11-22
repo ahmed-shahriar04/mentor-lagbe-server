@@ -82,7 +82,7 @@ router.post('/', verifyToken, verifyStudent, async (req, res) => {
  * Student: Get all applications submitted by logged-in student
  * GET /api/applications/student/my
  */
-router.get('/student/my', verifyToken, verifyStudent, async (req, res) => {
+router.get('/student/my', verifyToken, async (req, res) => {
   try {
     const { applicationsCollection } = getCollections();
     const myApps = await applicationsCollection
@@ -101,7 +101,7 @@ router.get('/student/my', verifyToken, verifyStudent, async (req, res) => {
  * Student: Cancel/Delete application while status is still 'pending'
  * DELETE /api/applications/:id
  */
-router.delete('/:id', verifyToken, verifyStudent, async (req, res) => {
+router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     if (!ObjectId.isValid(id)) {
@@ -115,7 +115,7 @@ router.delete('/:id', verifyToken, verifyStudent, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
 
-    if (application.studentEmail !== req.user.email) {
+    if (application.studentEmail !== req.user.email && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this application' });
     }
 
@@ -202,7 +202,7 @@ router.patch('/:id/status', verifyToken, verifyTutor, async (req, res) => {
  * Student Dashboard Stats
  * GET /api/applications/student/stats
  */
-router.get('/student/stats', verifyToken, verifyStudent, async (req, res) => {
+router.get('/student/stats', verifyToken, async (req, res) => {
   try {
     const { applicationsCollection, usersCollection, paymentsCollection } = getCollections();
     const email = req.user.email;
@@ -215,7 +215,7 @@ router.get('/student/stats', verifyToken, verifyStudent, async (req, res) => {
       paymentsCollection.findOne({ userEmail: email, paymentStatus: 'paid' }),
     ]);
 
-    const effectivePlan = hasPaid ? 'pro' : 'free';
+    const effectivePlan = hasPaid ? 'pro' : (user?.plan === 'pro' ? 'pro' : 'free');
 
     res.json({
       success: true,
@@ -236,7 +236,7 @@ router.get('/student/stats', verifyToken, verifyStudent, async (req, res) => {
  * Tutor Dashboard Stats
  * GET /api/applications/tutor/stats
  */
-router.get('/tutor/stats', verifyToken, verifyTutor, async (req, res) => {
+router.get('/tutor/stats', verifyToken, async (req, res) => {
   try {
     const { tuitionsCollection, applicationsCollection, usersCollection, paymentsCollection } = getCollections();
     const email = req.user.email;
@@ -249,7 +249,7 @@ router.get('/tutor/stats', verifyToken, verifyTutor, async (req, res) => {
       paymentsCollection.findOne({ userEmail: email, paymentStatus: 'paid' }),
     ]);
 
-    const effectivePlan = hasPaid ? 'pro' : 'free';
+    const effectivePlan = hasPaid ? 'pro' : (user?.plan === 'pro' ? 'pro' : 'free');
 
     res.json({
       success: true,

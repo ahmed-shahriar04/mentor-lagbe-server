@@ -39,6 +39,17 @@ app.use((req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Ensure database connection middleware for local & serverless (Vercel) environments
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('[Database Middleware Error]:', err.message);
+    res.status(500).json({ success: false, message: 'Database connection failed' });
+  }
+});
+
 // Health Check
 app.get('/', (req, res) => {
   res.json({
