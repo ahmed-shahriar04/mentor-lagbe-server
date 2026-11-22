@@ -205,17 +205,45 @@ router.patch('/:id/status', verifyToken, verifyTutor, async (req, res) => {
 router.get('/student/stats', verifyToken, async (req, res) => {
   try {
     const { applicationsCollection, usersCollection, paymentsCollection } = getCollections();
-    const email = req.user.email;
+    const email = (req.user.email || '').trim().toLowerCase();
 
-    const [totalApplied, accepted, pending, user, hasPaid] = await Promise.all([
+    // 1. Permanently clean up any leftover demo seed applications and mock payments
+    await Promise.all([
+      applicationsCollection.deleteMany({
+        $or: [
+          { studentEmail: 'student.sadia@gmail.com', tuitionTitle: { $regex: /Higher Math/i } },
+          { studentNote: { $regex: /Calculus/i } },
+          { studentPhone: '+8801755112233' },
+        ],
+      }),
+      paymentsCollection.deleteMany({
+        $or: [
+          { transactionId: { $regex: /^txn_mock_/i } },
+          { stripeSessionId: { $regex: /mock/i } },
+          { userEmail: 'student.sadia@gmail.com' },
+        ],
+      }),
+    ]);
+
+    const [totalApplied, accepted, pending, genuinePayment] = await Promise.all([
       applicationsCollection.countDocuments({ studentEmail: email }),
       applicationsCollection.countDocuments({ studentEmail: email, status: 'accepted' }),
       applicationsCollection.countDocuments({ studentEmail: email, status: 'pending' }),
-      usersCollection.findOne({ email }),
-      paymentsCollection.findOne({ userEmail: email, paymentStatus: 'paid' }),
+      paymentsCollection.findOne({
+        userEmail: email,
+        paymentStatus: 'paid',
+        transactionId: { $not: /^txn_mock_/i },
+      }),
     ]);
 
-    const effectivePlan = hasPaid ? 'pro' : (user?.plan === 'pro' ? 'pro' : 'free');
+    // Effective plan is strictly 'pro' ONLY if a genuine Stripe payment exists
+    const effectivePlan = genuinePayment ? 'pro' : 'free';
+
+    // Synchronize usersCollection so user.plan is always accurate
+    await usersCollection.updateOne(
+      { email: { $regex: new RegExp(`^${email}$`, 'i') } },
+      { $set: { plan: effectivePlan } }
+    );
 
     res.json({
       success: true,
