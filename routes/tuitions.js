@@ -74,24 +74,31 @@ router.get('/public', async (req, res) => {
       .toArray();
 
     // Populate actual mentor image and genuine verified pro status from usersCollection & paymentsCollection
-    const tutorEmails = [...new Set(tuitions.map((t) => t.tutorEmail).filter(Boolean))];
+    const tutorEmails = [...new Set(tuitions.map((t) => (t.tutorEmail || '').trim().toLowerCase()).filter(Boolean))];
     const [tutors, paidTutors] = await Promise.all([
       usersCollection
-        .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
+        .find(
+          { email: { $in: tutorEmails.map((e) => new RegExp(`^${e}$`, 'i')) } },
+          { projection: { email: 1, image: 1, name: 1, plan: 1 } }
+        )
         .toArray(),
       paymentsCollection
-        .find({ userEmail: { $in: tutorEmails }, paymentStatus: 'paid' }, { projection: { userEmail: 1 } })
+        .find(
+          { userEmail: { $in: tutorEmails.map((e) => new RegExp(`^${e}$`, 'i')) }, paymentStatus: 'paid' },
+          { projection: { userEmail: 1 } }
+        )
         .toArray(),
     ]);
-    const tutorMap = new Map(tutors.map((u) => [u.email, u]));
-    const paidTutorSet = new Set(paidTutors.map((p) => p.userEmail));
+    const tutorMap = new Map(tutors.map((u) => [(u.email || '').toLowerCase(), u]));
+    const paidTutorSet = new Set(paidTutors.map((p) => (p.userEmail || '').toLowerCase()));
 
     const enrichedTuitions = tuitions.map((t) => {
-      const tutor = tutorMap.get(t.tutorEmail);
-      const realImage = tutor ? (tutor.image || null) : (t.tutorImage || null);
-      const realName = tutor ? (tutor.name || t.tutorName) : t.tutorName;
+      const emailKey = (t.tutorEmail || '').trim().toLowerCase();
+      const tutor = tutorMap.get(emailKey);
+      const realImage = tutor?.image || t.tutorImage || null;
+      const realName = tutor?.name || t.tutorName;
       // Pro badge only if verified paid payment exists
-      const isProTutor = tutor ? (tutor.plan === 'pro' && paidTutorSet.has(tutor.email)) : false;
+      const isProTutor = tutor ? (tutor.plan === 'pro' && paidTutorSet.has(emailKey)) : false;
       return {
         ...t,
         tutorImage: realImage,
@@ -129,24 +136,31 @@ router.get('/featured', async (req, res) => {
       .limit(6)
       .toArray();
 
-    const tutorEmails = [...new Set(featured.map((t) => t.tutorEmail).filter(Boolean))];
+    const tutorEmails = [...new Set(featured.map((t) => (t.tutorEmail || '').trim().toLowerCase()).filter(Boolean))];
     const [tutors, paidTutors] = await Promise.all([
       usersCollection
-        .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
+        .find(
+          { email: { $in: tutorEmails.map((e) => new RegExp(`^${e}$`, 'i')) } },
+          { projection: { email: 1, image: 1, name: 1, plan: 1 } }
+        )
         .toArray(),
       paymentsCollection
-        .find({ userEmail: { $in: tutorEmails }, paymentStatus: 'paid' }, { projection: { userEmail: 1 } })
+        .find(
+          { userEmail: { $in: tutorEmails.map((e) => new RegExp(`^${e}$`, 'i')) }, paymentStatus: 'paid' },
+          { projection: { userEmail: 1 } }
+        )
         .toArray(),
     ]);
-    const tutorMap = new Map(tutors.map((u) => [u.email, u]));
-    const paidTutorSet = new Set(paidTutors.map((p) => p.userEmail));
+    const tutorMap = new Map(tutors.map((u) => [(u.email || '').toLowerCase(), u]));
+    const paidTutorSet = new Set(paidTutors.map((p) => (p.userEmail || '').toLowerCase()));
 
     const enrichedFeatured = featured.map((t) => {
-      const tutor = tutorMap.get(t.tutorEmail);
-      const realImage = tutor ? (tutor.image || null) : (t.tutorImage || null);
-      const realName = tutor ? (tutor.name || t.tutorName) : t.tutorName;
+      const emailKey = (t.tutorEmail || '').trim().toLowerCase();
+      const tutor = tutorMap.get(emailKey);
+      const realImage = tutor?.image || t.tutorImage || null;
+      const realName = tutor?.name || t.tutorName;
       // Pro badge only if genuine verified payment exists
-      const isProTutor = tutor ? (tutor.plan === 'pro' && paidTutorSet.has(tutor.email)) : false;
+      const isProTutor = tutor ? (tutor.plan === 'pro' && paidTutorSet.has(emailKey)) : false;
       return {
         ...t,
         tutorImage: realImage,

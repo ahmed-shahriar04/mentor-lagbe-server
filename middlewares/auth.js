@@ -93,17 +93,19 @@ export const verifyToken = async (req, res, next) => {
     }
 
     // 3. Sync or fetch user in MongoDB users collection
-    const { usersCollection } = getCollections();
+    const { usersCollection, tuitionsCollection } = getCollections();
     const cleanEmail = (payload.email || '').trim().toLowerCase();
     let user = await usersCollection.findOne({
       email: { $regex: new RegExp(`^${cleanEmail}$`, 'i') },
     });
 
+    const userPayloadImage = payload.image || payload.picture || '';
+
     if (!user) {
       const newUser = {
         name: payload.name || cleanEmail.split('@')[0],
         email: cleanEmail,
-        image: payload.image || payload.picture || '',
+        image: userPayloadImage,
         role: payload.role || 'student',
         phone: payload.phone || '',
         bio: payload.bio || '',
@@ -112,6 +114,33 @@ export const verifyToken = async (req, res, next) => {
       };
       const result = await usersCollection.insertOne(newUser);
       user = { _id: result.insertedId, ...newUser };
+    } else {
+      // If user exists, but doesn't have an image or has placeholder image and payload has a real image, update MongoDB!
+      const shouldUpdateImage = Boolean(
+        userPayloadImage &&
+        (!user.image || user.image === '' || user.image.includes('unsplash') || user.image.includes('ui-avatars'))
+      );
+      const shouldUpdateName = Boolean(payload.name && (!user.name || user.name === cleanEmail.split('@')[0]));
+
+      if (shouldUpdateImage || shouldUpdateName) {
+        const updateSet = {};
+        if (shouldUpdateImage) updateSet.image = userPayloadImage;
+        if (shouldUpdateName) updateSet.name = payload.name;
+
+        await usersCollection.updateOne({ _id: user._id }, { $set: updateSet });
+        user = { ...user, ...updateSet };
+
+        // Also update tuitions posted by this tutor so their listing shows the real picture!
+        if (tuitionsCollection) {
+          const tuitionUpdates = {};
+          if (shouldUpdateImage) tuitionUpdates.tutorImage = userPayloadImage;
+          if (shouldUpdateName) tuitionUpdates.tutorName = payload.name;
+          await tuitionsCollection.updateMany(
+            { tutorEmail: { $regex: new RegExp(`^${cleanEmail}$`, 'i') } },
+            { $set: tuitionUpdates }
+          );
+        }
+      }
     }
 
     // Attach user to request

@@ -11,12 +11,12 @@ const router = express.Router();
  */
 router.post('/login', async (req, res) => {
   try {
-    const { email } = req.body || {};
+    const { email, name, image } = req.body || {};
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    const { usersCollection } = getCollections();
+    const { usersCollection, tuitionsCollection } = getCollections();
     const cleanEmail = email.trim().toLowerCase();
 
     let user = await usersCollection.findOne({
@@ -32,15 +32,48 @@ router.post('/login', async (req, res) => {
       }
 
       const newUser = {
-        name: cleanEmail.split('@')[0],
+        name: name ? name.trim() : cleanEmail.split('@')[0],
         email: cleanEmail,
         role: defaultRole,
         plan: 'free',
-        image: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=120&auto=format&fit=crop',
+        image: image || '',
         createdAt: new Date(),
       };
       const result = await usersCollection.insertOne(newUser);
       user = { _id: result.insertedId, ...newUser };
+    } else {
+      // User exists: update name and/or avatar if incoming has real image or name
+      const updates = {};
+      if (name && (!user.name || user.name === cleanEmail.split('@')[0])) {
+        updates.name = name.trim();
+      }
+      if (
+        image &&
+        (!user.image ||
+          user.image === '' ||
+          user.image.includes('unsplash') ||
+          user.image.includes('ui-avatars') ||
+          image.includes('googleusercontent') ||
+          image.includes('http'))
+      ) {
+        updates.image = image.trim();
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await usersCollection.updateOne({ _id: user._id }, { $set: updates });
+        user = { ...user, ...updates };
+
+        // Synchronize tutor name and avatar on all their posted tuitions
+        if (tuitionsCollection) {
+          const tuitionUpdates = {};
+          if (updates.name) tuitionUpdates.tutorName = updates.name;
+          if (updates.image) tuitionUpdates.tutorImage = updates.image;
+          await tuitionsCollection.updateMany(
+            { tutorEmail: { $regex: new RegExp(`^${cleanEmail}$`, 'i') } },
+            { $set: tuitionUpdates }
+          );
+        }
+      }
     }
 
     res.json({
@@ -51,7 +84,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.role,
         plan: user.plan || 'free',
-        image: user.image || '',
+        image: user.image || image || '',
         phone: user.phone || '',
         bio: user.bio || '',
       },
@@ -121,7 +154,7 @@ router.patch('/profile', verifyToken, async (req, res) => {
     if (image) updateFields.image = image.trim();
 
     await usersCollection.updateOne(
-      { email: req.user.email },
+      { email: { $regex: new RegExp(`^${req.user.email}$`, 'i') } },
       { $set: updateFields }
     );
 
@@ -132,12 +165,14 @@ router.patch('/profile', verifyToken, async (req, res) => {
     if (image) tuitionUpdates.tutorImage = image.trim();
     if (Object.keys(tuitionUpdates).length > 0) {
       await tuitionsCollection.updateMany(
-        { tutorEmail: req.user.email },
+        { tutorEmail: { $regex: new RegExp(`^${req.user.email}$`, 'i') } },
         { $set: tuitionUpdates }
       );
     }
 
-    const updatedUser = await usersCollection.findOne({ email: req.user.email });
+    const updatedUser = await usersCollection.findOne({
+      email: { $regex: new RegExp(`^${req.user.email}$`, 'i') },
+    });
 
     res.json({
       success: true,
