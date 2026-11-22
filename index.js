@@ -90,10 +90,46 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Purge mock seed purchases & mock student applications so every account is 100% fresh
+async function resetMockPurchases() {
+  try {
+    const { paymentsCollection, applicationsCollection, usersCollection } = getCollections();
+    if (!paymentsCollection || !applicationsCollection || !usersCollection) return;
+
+    // Remove any mock payments that gave artificial pro status
+    await paymentsCollection.deleteMany({
+      $or: [
+        { transactionId: { $regex: /^txn_mock_/i } },
+        { stripeSessionId: { $regex: /mock/i } },
+        { userEmail: 'student.sadia@gmail.com' },
+      ],
+    });
+
+    // Remove mock applications for demo student
+    await applicationsCollection.deleteMany({
+      studentEmail: 'student.sadia@gmail.com',
+    });
+
+    // Reset plans to free for users who don't have a live Stripe paid payment record
+    const realPaidRecords = await paymentsCollection.find({ paymentStatus: 'paid' }).toArray();
+    const paidEmails = new Set(realPaidRecords.map((p) => p.userEmail));
+
+    await usersCollection.updateMany(
+      { email: { $nin: Array.from(paidEmails) } },
+      { $set: { plan: 'free' } }
+    );
+
+    console.log('[MentorLagbe] All accounts reset to 100% fresh Free tier with 0 artificial purchases.');
+  } catch (err) {
+    console.warn('[MentorLagbe] Reset notice:', err.message);
+  }
+}
+
 // Connect to MongoDB and start server
 async function startServer() {
   try {
     await connectDB();
+    await resetMockPurchases();
     app.listen(PORT, () => {
       console.log(`[MentorLagbe Server] Server running on port ${PORT}`);
       console.log(`[MentorLagbe Server] Health check available at http://localhost:${PORT}/api/health`);

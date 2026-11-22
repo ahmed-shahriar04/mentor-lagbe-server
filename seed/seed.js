@@ -63,7 +63,7 @@ const sampleStudents = [
     image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop',
     phone: '+8801755112233',
     bio: 'HSC Candidate preparing for engineering admission tests.',
-    plan: 'pro',
+    plan: 'free',
     createdAt: new Date(),
   },
   {
@@ -307,82 +307,8 @@ export async function runSeed() {
     const tuitionResult = await tuitionsCollection.insertMany(sampleTuitions);
     console.log(`[Seed] Inserted ${sampleTuitions.length} rich approved tuitions.`);
 
-    // Insert Sample Applications
-    const firstTuition = await tuitionsCollection.findOne({});
-    if (firstTuition) {
-      await applicationsCollection.insertMany([
-        {
-          tuitionId: firstTuition._id.toString(),
-          tuitionTitle: firstTuition.title,
-          subject: firstTuition.subject,
-          monthlyFee: firstTuition.monthlyFee,
-          tutorEmail: firstTuition.tutorEmail,
-          studentName: 'Sadia Rahman',
-          studentEmail: 'student.sadia@gmail.com',
-          studentPhone: '+8801755112233',
-          preferredSchedule: 'Sun, Tue, Thu (7:00 PM - 8:30 PM)',
-          studentNote: 'Sir, I want to clear all Calculus concepts for HSC 2026 board exam.',
-          status: 'accepted',
-          appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 48),
-        },
-        {
-          tuitionId: firstTuition._id.toString(),
-          tuitionTitle: firstTuition.title,
-          subject: firstTuition.subject,
-          monthlyFee: firstTuition.monthlyFee,
-          tutorEmail: firstTuition.tutorEmail,
-          studentName: 'Rafiul Islam',
-          studentEmail: 'student.rafiul@gmail.com',
-          studentPhone: '+8801822445566',
-          preferredSchedule: 'Mon, Wed, Fri (4:00 PM - 5:30 PM)',
-          studentNote: 'Looking for guidance in both papers.',
-          status: 'pending',
-          appliedAt: new Date(Date.now() - 1000 * 60 * 60 * 12),
-        }
-      ]);
-      console.log('[Seed] Inserted sample applications.');
-
-      // Insert Sample Review for accepted application
-      await reviewsCollection.insertOne({
-        tuitionId: firstTuition._id.toString(),
-        studentEmail: 'student.sadia@gmail.com',
-        studentName: 'Sadia Rahman',
-        studentImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop',
-        rating: 5,
-        feedback: 'Dr. Tanvir Sir explains every mathematical derivation from the roots. Highly recommended for any serious HSC student!',
-        createdAt: new Date(),
-      });
-      console.log('[Seed] Inserted sample review.');
-    }
-
-    // Insert Sample Payment Records
-    await paymentsCollection.insertMany([
-      {
-        userEmail: 'tanvir.buet@gmail.com',
-        userName: 'Dr. Tanvir Ahmed',
-        userRole: 'tutor',
-        planName: 'pro',
-        amount: 15,
-        currency: 'USD',
-        transactionId: 'txn_mock_tutor_101',
-        stripeSessionId: 'cs_test_mock_101',
-        paymentStatus: 'paid',
-        paidAt: new Date(Date.now() - 1000 * 60 * 60 * 72),
-      },
-      {
-        userEmail: 'student.sadia@gmail.com',
-        userName: 'Sadia Rahman',
-        userRole: 'student',
-        planName: 'pro',
-        amount: 10,
-        currency: 'USD',
-        transactionId: 'txn_mock_student_202',
-        stripeSessionId: 'cs_test_mock_202',
-        paymentStatus: 'paid',
-        paidAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
-      }
-    ]);
-    console.log('[Seed] Inserted sample Stripe transactions.');
+    // Keep applications and payments clean so all accounts start 100% fresh
+    console.log('[Seed] Applications & payments kept completely clean for fresh evaluation.');
 
     console.log('✅ Seeding completed successfully!');
     process.exit(0);
