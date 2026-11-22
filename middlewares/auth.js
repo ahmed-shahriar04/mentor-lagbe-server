@@ -94,12 +94,15 @@ export const verifyToken = async (req, res, next) => {
 
     // 3. Sync or fetch user in MongoDB users collection
     const { usersCollection } = getCollections();
-    let user = await usersCollection.findOne({ email: payload.email });
+    const cleanEmail = (payload.email || '').trim().toLowerCase();
+    let user = await usersCollection.findOne({
+      email: { $regex: new RegExp(`^${cleanEmail}$`, 'i') },
+    });
 
     if (!user) {
       const newUser = {
-        name: payload.name || payload.email.split('@')[0],
-        email: payload.email,
+        name: payload.name || cleanEmail.split('@')[0],
+        email: cleanEmail,
         image: payload.image || payload.picture || '',
         role: payload.role || 'student',
         phone: payload.phone || '',
