@@ -53,3 +53,11 @@ JWT_SECRET=super_secret_jwt_key_mentorlagbe_2026
    ```
    http://localhost:5000/api/health
    ```
+
+
+## 🔑 Test Credentials (Quick Evaluation)
+- **Admin Email:** `shahriarahmedriaz_admin@mentrolagbe.com`
+- **Admin Password:** `mentrolagbe_passDeboNa`
+- **Tutor Email:** `shahriarahmedriaz.tutor@mentorlagbe.com`
+- **Tutor Password:** `riaz_KI_mentor?`
+- **Live Client URL:** [https://mentor-lagbe-naki.vercel.app/](https://mentor-lagbe-naki.vercel.app/)
