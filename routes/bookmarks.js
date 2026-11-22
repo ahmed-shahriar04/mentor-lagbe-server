@@ -42,10 +42,17 @@ router.get('/', verifyToken, verifyStudent, async (req, res) => {
 });
 
 // Add bookmark
-router.post('/:tuitionId', verifyToken, verifyStudent, async (req, res) => {
+router.post('/:tuitionId', verifyToken, async (req, res) => {
   try {
     const { tuitionId } = req.params;
     const { bookmarksCollection, usersCollection, tuitionsCollection } = getCollections();
+
+    if (req.user.role !== 'student') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only students can bookmark tuitions. Tutors and Admins manage batches from their dashboard.',
+      });
+    }
 
     // Verify tuition exists
     const tuition = await tuitionsCollection.findOne({ _id: new ObjectId(tuitionId) });

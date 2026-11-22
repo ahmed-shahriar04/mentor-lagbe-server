@@ -180,20 +180,24 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Tuition listing not found' });
     }
 
-    // Fetch tutor profile summary if available
+    // Fetch tutor profile summary if available (case-insensitive)
+    const tutorEmail = (tuition.tutorEmail || '').trim();
     const tutor = await usersCollection.findOne(
-      { email: tuition.tutorEmail },
+      { email: { $regex: new RegExp(`^${tutorEmail}$`, 'i') } },
       { projection: { name: 1, email: 1, image: 1, phone: 1, bio: 1, plan: 1 } }
     );
+
+    const tutorImage = tutor?.image || tuition.tutorImage || null;
+    const tutorName = tutor?.name || tuition.tutorName;
 
     res.json({
       success: true,
       data: {
         ...tuition,
-        tutorImage: tutor ? (tutor.image || null) : (tuition.tutorImage || null),
-        tutorName: tutor ? (tutor.name || tuition.tutorName) : tuition.tutorName,
+        tutorImage,
+        tutorName,
         isProTutor: tutor ? tutor.plan === 'pro' : Boolean(tuition.isProTutor),
-        tutorDetails: tutor || { name: tuition.tutorName, email: tuition.tutorEmail },
+        tutorDetails: tutor ? { ...tutor, image: tutorImage } : { name: tutorName, email: tuition.tutorEmail, image: tutorImage },
       },
     });
   } catch (error) {
