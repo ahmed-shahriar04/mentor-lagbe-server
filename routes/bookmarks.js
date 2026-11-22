@@ -73,7 +73,7 @@ router.post('/:tuitionId', verifyToken, verifyStudent, async (req, res) => {
         return res.status(403).json({
           success: false,
           code: 'BOOKMARK_LIMIT_REACHED',
-          message: 'Free students can bookmark up to 5 tuitions. Upgrade to Pro for unlimited bookmarks!',
+          message: 'Free students can bookmark up to 5 tuitions. Upgrade to Pro Student Plan ($10) for unlimited bookmarks!',
         });
       }
     }

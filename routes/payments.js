@@ -18,9 +18,12 @@ const router = express.Router();
  */
 router.post('/create-checkout-session', verifyToken, async (req, res) => {
   try {
-    const userRole = req.user.role;
-    const isTutor = userRole === 'tutor';
-    // $15 for Tutor (1500 cents), $10 for Student (1000 cents)
+    const { planType } = req.body || {};
+    // If client specified 'tutor' or 'student', respect it; otherwise fall back to user's registered role
+    const effectiveRole = planType === 'tutor' || planType === 'student' ? planType : req.user.role;
+    const isTutor = effectiveRole === 'tutor';
+
+    // Pricing: Pro Tutor Plan = $15 (1500 cents), Pro Student Plan = $10 (1000 cents)
     const unitAmount = isTutor ? 1500 : 1000;
     const planName = isTutor ? 'MentorLagbe Pro Tutor Plan' : 'MentorLagbe Pro Student Plan';
     const description = isTutor
@@ -28,7 +31,6 @@ router.post('/create-checkout-session', verifyToken, async (req, res) => {
       : 'Unlimited bookmarks, priority booking, direct mentor messaging';
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
       mode: 'payment',
       customer_email: req.user.email,
       line_items: [
@@ -38,7 +40,11 @@ router.post('/create-checkout-session', verifyToken, async (req, res) => {
             product_data: {
               name: planName,
               description: description,
-              images: ['https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=600&auto=format&fit=crop'],
+              images: [
+                isTutor
+                  ? 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=600&auto=format&fit=crop'
+                  : 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=600&auto=format&fit=crop',
+              ],
             },
             unit_amount: unitAmount,
           },
@@ -49,7 +55,7 @@ router.post('/create-checkout-session', verifyToken, async (req, res) => {
         userId: req.user.id || '',
         userEmail: req.user.email,
         userName: req.user.name,
-        userRole: userRole,
+        userRole: effectiveRole,
         planName: 'pro',
       },
       success_url: `${CLIENT_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -205,6 +211,25 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   }
 
   res.json({ received: true });
+});
+
+/**
+ * User: Get my personal payment history & receipts
+ * GET /api/payments/my-history
+ */
+router.get('/my-history', verifyToken, async (req, res) => {
+  try {
+    const { paymentsCollection } = getCollections();
+    const payments = await paymentsCollection
+      .find({ userEmail: req.user.email })
+      .sort({ paidAt: -1 })
+      .toArray();
+
+    res.json({ success: true, data: payments });
+  } catch (error) {
+    console.error('Error fetching user payment history:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch payment history' });
+  }
 });
 
 /**

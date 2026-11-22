@@ -12,7 +12,7 @@ const router = express.Router();
  */
 router.get('/public', async (req, res) => {
   try {
-    const { tuitionsCollection } = getCollections();
+    const { tuitionsCollection, usersCollection } = getCollections();
     const {
       search = '',
       subject = '',
@@ -73,9 +73,26 @@ router.get('/public', async (req, res) => {
       .limit(limitNumber)
       .toArray();
 
+    // Populate actual mentor image and pro status from usersCollection
+    const tutorEmails = [...new Set(tuitions.map((t) => t.tutorEmail).filter(Boolean))];
+    const tutors = await usersCollection
+      .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
+      .toArray();
+    const tutorMap = new Map(tutors.map((u) => [u.email, u]));
+
+    const enrichedTuitions = tuitions.map((t) => {
+      const tutor = tutorMap.get(t.tutorEmail);
+      return {
+        ...t,
+        tutorImage: tutor?.image || t.tutorImage || null,
+        tutorName: tutor?.name || t.tutorName,
+        isProTutor: tutor ? tutor.plan === 'pro' : false,
+      };
+    });
+
     res.json({
       success: true,
-      data: tuitions,
+      data: enrichedTuitions,
       pagination: {
         total,
         page: pageNumber,
@@ -95,14 +112,30 @@ router.get('/public', async (req, res) => {
  */
 router.get('/featured', async (req, res) => {
   try {
-    const { tuitionsCollection } = getCollections();
+    const { tuitionsCollection, usersCollection } = getCollections();
     const featured = await tuitionsCollection
       .find({ approvalStatus: 'approved', isActive: true })
       .sort({ createdAt: -1 })
       .limit(6)
       .toArray();
 
-    res.json({ success: true, data: featured });
+    const tutorEmails = [...new Set(featured.map((t) => t.tutorEmail).filter(Boolean))];
+    const tutors = await usersCollection
+      .find({ email: { $in: tutorEmails } }, { projection: { email: 1, image: 1, name: 1, plan: 1 } })
+      .toArray();
+    const tutorMap = new Map(tutors.map((u) => [u.email, u]));
+
+    const enrichedFeatured = featured.map((t) => {
+      const tutor = tutorMap.get(t.tutorEmail);
+      return {
+        ...t,
+        tutorImage: tutor?.image || t.tutorImage || null,
+        tutorName: tutor?.name || t.tutorName,
+        isProTutor: tutor ? tutor.plan === 'pro' : false,
+      };
+    });
+
+    res.json({ success: true, data: enrichedFeatured });
   } catch (error) {
     console.error('Error fetching featured tuitions:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch featured tuitions' });
@@ -179,15 +212,12 @@ router.post('/', verifyToken, verifyTutor, async (req, res) => {
     const isPro = currentUser && currentUser.plan === 'pro';
 
     if (!isPro) {
-      const existingCount = await tuitionsCollection.countDocuments({
-        tutorEmail: req.user.email,
-      });
-
+      const existingCount = await tuitionsCollection.countDocuments({ tutorEmail: req.user.email });
       if (existingCount >= 2) {
         return res.status(403).json({
           success: false,
           code: 'LIMIT_REACHED',
-          message: 'Free Plan tutors can post up to 2 tuitions. Please upgrade to Pro Plan for unlimited posts!',
+          message: 'Free Plan tutors can post up to 2 tuitions. Please upgrade to Pro Tutor Plan ($15) for unlimited postings!',
         });
       }
     }
@@ -204,6 +234,8 @@ router.post('/', verifyToken, verifyTutor, async (req, res) => {
       description: description.trim(),
       tutorName: req.user.name,
       tutorEmail: req.user.email,
+      tutorImage: currentUser?.image || req.user.image || '',
+      isProTutor: isPro,
       approvalStatus: 'pending',
       isActive: true,
       createdAt: new Date(),
